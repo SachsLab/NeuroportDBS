@@ -1,4 +1,4 @@
-The PC that runs our software is directly connected to the acquisition system but it is never connected to the internet. Thus, we create a portable install on a thumb drive which we then copy to the clinical PC.
+The PC that runs our software is directly connected to the acquisition system, but it is never connected to the internet. Thus, we create a portable install on a thumb drive which we then copy to the clinical PC.
 
 > For development or testing on an internet-connected computer, or a non-Windows computer, please look at the [For Developers](for-developers.md) documentation.
 

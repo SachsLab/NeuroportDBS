@@ -1,3 +1,5 @@
+import typing
+
 import numpy as np
 # use the same GUI format as the other ones
 from qtpy.QtWidgets import QComboBox, QLineEdit, QLabel, QDialog, QVBoxLayout, QWidget, \
@@ -105,7 +107,7 @@ class ProcedureWidget(QWidget):
 
         # populate with defaults if empty
         if not self.procedure_settings:
-            self.update_settings_from_db(-1)
+            self.update_settings_from_db(None)
 
         self.proc_enums = DBWrapper().return_enums("procedure")
         self._setup_ui()
@@ -115,7 +117,7 @@ class ProcedureWidget(QWidget):
         proc_layout = QGridLayout(self)
 
         row = 0
-        proc_layout.addWidget(QLabel("Previous procedures: "), row, 0, 1, 1)
+        proc_layout.addWidget(QLabel("Procedure: "), row, 0, 1, 1)
 
         prev_proc = QComboBox()
         prev_proc.setObjectName("procedure_QComboBox")
@@ -195,7 +197,7 @@ class ProcedureWidget(QWidget):
         # Clear combobox and fill with a summary of each procedure
         prev_proc.blockSignals(block)
         prev_proc.clear()
-        prev_proc.addItem("")  # 0th item is always blank.
+        prev_proc.addItem("(new)")  # 0th item indicates a new procedure
         prev_proc.addItems([
             " ".join([
                 str(x.procedure_id), x.target_name, x.recording_config, x.date.strftime('%Y-%m-%d')
@@ -203,7 +205,7 @@ class ProcedureWidget(QWidget):
             for x in self.all_procedures
         ])
         row_ix = 0
-        if "procedure_id" in self.procedure_settings and self.procedure_settings["procedure_id"] != -1:
+        if "procedure_id" in self.procedure_settings and self.procedure_settings["procedure_id"] is not None:
             known_ids = [_.procedure_id for _ in self.all_procedures]
             if self.procedure_settings["procedure_id"] in known_ids:
                 row_ix = known_ids.index(self.procedure_settings["procedure_id"]) + 1
@@ -251,16 +253,20 @@ class ProcedureWidget(QWidget):
         self.check_all_procedures(sub_id, block)
 
     def procedure_selection_change(self):
-        prev_proc = self.findChild(QComboBox, name="procedure_QComboBox")
-        id = -1
+        prev_proc: QComboBox = self.findChild(QComboBox, name="procedure_QComboBox")
+        id: typing.Optional[int] = None
         if prev_proc.currentIndex() > 0:
+            # If the user selected a procedure other than the '(new)' procedure.
             ix = prev_proc.currentIndex() - 1  # -1 because first entry is always blank.
             id = self.all_procedures[ix].procedure_id
         self.update_settings_from_db(id)
         self.update_proc_widgets_from_settings()
 
-    def update_settings_from_db(self, idx):
-        res_dict = dict({"procedure_id": idx}, **DBWrapper().load_procedure_details(idx, exclude=['subject', 'procedure_id']))
+    def update_settings_from_db(self, idx: typing.Optional[int]):
+        res_dict = DBWrapper().load_procedure_details(idx, exclude=['subject', 'procedure_id'])
+        if idx is None and bool(self.procedure_settings):
+            res_dict.update(self.procedure_settings)
+        res_dict["procedure_id"] = idx
         self.procedure_settings.update(res_dict)
 
     def update_proc_widgets_from_settings(self):

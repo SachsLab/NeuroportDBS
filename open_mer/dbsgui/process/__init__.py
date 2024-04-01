@@ -3,10 +3,10 @@ from pathlib import Path
 
 from qtpy import QtCore
 
-from .trajectory import NSPBufferWorker
+from .trajectory import SnippetWorker
 
 
-__all__ = ["build_ini_paths", "parse_ini", "NSPBufferWorker"]
+__all__ = ["build_ini_paths", "parse_ini", "SnippetWorker"]
 
 
 def build_ini_paths() -> list[Path]:

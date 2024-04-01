@@ -1,5 +1,6 @@
 import time
 import json
+import typing
 
 import numpy as np
 import zmq
@@ -10,14 +11,16 @@ from serf.tools.db_wrap import DBWrapper
 from open_mer.data_source.cerebus import SAMPLINGGROUPS
 
 
-class NSPBufferWorker:
+class SnippetWorker:
 
-    def __init__(self, ipc_settings, buffer_settings):
+    def __init__(self, ipc_settings, buffer_settings, procedure_id: typing.Optional = None):
         self._ipc_settings = ipc_settings
         self._buffer_settings = buffer_settings
         self.buffer = None
         self.db_wrapper = DBWrapper()
         self.procedure_id = None
+        if procedure_id is not None:
+            self.reset_procedure(procedure_id)
 
         # cbSDK; connect using default parameters
         self.cbsdk_conn = CbSdkConnection(simulate_ok=False)
@@ -207,7 +210,7 @@ class NSPBufferWorker:
 
             # only process the NSP data if Central is recording
             _status = "recording" if self.cbsdk_conn.get_recording_state() else "notrecording"
-            if _status == "recording" and data and current_depth:
+            if _status == "recording" and data and current_depth is not None:
 
                 if not self.delay_done:
                     self.delay_done = self.wait_for_delay_end(data)

@@ -1,15 +1,18 @@
-import time
 import json
+from pathlib import Path
+import time
+import typing
 
+import typer
 import zmq
 from serf.tools.db_wrap import DBWrapper
 
-from open_mer.scripts.Depth_Process import build_ini_paths, parse_ini
+from open_mer.scripts.Snippets_Process import build_ini_paths, parse_ini
 
 
 class FeaturesWorker:
 
-    def __init__(self, ipc_settings, buffer_settings, feature_settings):
+    def __init__(self, ipc_settings, buffer_settings, feature_settings, procedure_id: typing.Optional = None):
         self._ipc_settings = ipc_settings
         self._buffer_settings = buffer_settings
         self._feature_settings = feature_settings
@@ -22,7 +25,7 @@ class FeaturesWorker:
         self.procedure_id = None
         self.last_datum_id = 0  # fetch datum ids greater than this value
 
-        self._select_latest_procedure()
+        self._select_procedure(procedure_id)
 
         self.is_running = True
 
@@ -34,12 +37,16 @@ class FeaturesWorker:
         self._ctrl_sock.connect(f"tcp://localhost:{self._ipc_settings['procedure_settings']}")
         self._ctrl_sock.setsockopt_string(zmq.SUBSCRIBE, "procedure_settings")
 
-    def _select_latest_procedure(self):
-        # Get the 0th subject and the -1th procedure for that subject
-        sub_id = list(self.db_wrapper.list_all_subjects())[0]
-        subj_details = self.db_wrapper.load_subject_details(sub_id)
-        self.db_wrapper.select_subject(subj_details["subject_id"])
-        proc = list(self.db_wrapper.list_all_procedures(subj_details["subject_id"]))[-1]
+    def _select_procedure(self, procedure_id: typing.Optional[int] = None):
+        if procedure_id is None:
+            # Get the 0th subject and the -1th procedure for that subject
+            sub_id = list(self.db_wrapper.list_all_subjects())[0]
+            subj_details = self.db_wrapper.load_subject_details(sub_id)
+            self.db_wrapper.select_subject(subj_details["subject_id"])
+            proc = list(self.db_wrapper.list_all_procedures(subj_details["subject_id"]))[-1]
+        else:
+            self.db_wrapper.select_procedure(procedure_id)
+            proc = self.db_wrapper.current_procedure
         sett_dict = {
             "procedure": {"procedure_id": proc.procedure_id},
             "features": [v[0] for k, v in self._feature_settings.items() if v[1]]
@@ -93,9 +100,12 @@ class FeaturesWorker:
             # time.sleep(0.1)
 
 
-def main():
-    ipc_settings, buffer_settings, feature_settings = parse_ini(build_ini_paths())
-    worker = FeaturesWorker(ipc_settings, buffer_settings, feature_settings)
+def main(ini_path: typing.Optional[Path] = None, procedure_id: typing.Optional[int] = None):
+    ini_paths = build_ini_paths()
+    if ini_path is not None:
+        ini_paths.append(ini_path)
+    ipc_settings, buffer_settings, feature_settings = parse_ini(ini_paths)
+    worker = FeaturesWorker(ipc_settings, buffer_settings, feature_settings, procedure_id=procedure_id)
     try:
         worker.run_forever()
     except KeyboardInterrupt:
@@ -103,4 +113,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    typer.run(main)

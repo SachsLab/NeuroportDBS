@@ -1,10 +1,10 @@
 ## Repository Organization
 
-* Library and Application code in the /open_mer folder
-  * Entry points in /open_mer/scripts
-* TODO: Unit tests in the /tests folder.
-* Documentation in the /docs folder
-* Scratch scripts in /scripts
+* `/open_mer`: Library and Application code
+  * `/open_mer/scripts`: Entry points 
+* `/tests` TODO: Unit tests
+* `/docs`: Documentation
+* `/scripts`: Scratch scripts
 
 ## Maintaining the Documentation
 
@@ -43,13 +43,13 @@ This section is referring to communication among the applications within the Ope
 
 The applications all run independently of each other, but most of them work better in combination. To communicate information between applications we use [ZeroMQ](https://zeromq.org/).
 
-| Publisher      | Port  | Topic              | Message                                                | Subscribers    |
-|----------------|-------|--------------------|--------------------------------------------------------|----------------|
-| ProcedureGUI   | 60001 | procedure_settings | json of settings-dicts "procedure" and ??              | FeaturesGUI    |
-| Depth_Process  | 60002 | snippet_status     | (startup, notrecording, recording, accumulating, done) | ProcedureGUI   |
-| SweepGUI       | 60003 | channel_select     | json with channel, range, highpass                     | FeaturesGUI    |
-| FeaturesGUI    | 60004 | features           | refresh                                                | ProcedureGUI   |
-| DepthGUI       | 60005 | ddu                | float of depth                                         | Depth_Process  |
+| Publisher         | Port  | Topic              | Message                                                | Subscribers       |
+|-------------------|-------|--------------------|--------------------------------------------------------|-------------------|
+| ProcedureGUI      | 60001 | procedure_settings | json of settings. "procedure": {}, "running": bool     | Segments_Process  |
+| Segments_Process  | 60002 | snippet_status     | (startup, notrecording, recording, accumulating, done) | ProcedureGUI      |
+| SweepGUI          | 60003 | channel_select     | json with channel, range, highpass                     | FeaturesGUI       |
+| Features_Process  | 60004 | features           | refresh                                                | ProcedureGUI      |
+| DepthGUI          | 60005 | ddu                | float of depth                                         | Segments_Process  |
 
 We also have one LSL stream coming from the DepthGUI. Old version of the SERF Depth_Process might still be using it but they should be migrated. 
 
@@ -88,7 +88,7 @@ Modify the [DepthGUI settings](settings.md#depthguiini) to use "cbsdk playback" 
 
 ### Playback XDF file
 
-If you have a correctly formatted file, it may be enough to use [XDFStreamer](https://github.com/labstreaminglayer/App-XDFStreamer).
+If you have a correctly formatted file, it may be enough to use [pyxdf playback](https://github.com/xdf-modules/pyxdf/blob/main/pyxdf/examples/playback_lsl.py).
 
 TODO: More instructions needed.
 

@@ -1,9 +1,12 @@
+import typing
+from typing_extensions import Self
+
 from qtpy import QtCore
 
 
 class IDataSource(QtCore.QObject):
 
-    def __init__(self, on_connect_cb=None):
+    def __init__(self, on_connect_cb: typing.Optional[typing.Callable[[Self], None]] = None):
         super().__init__()  # QObject init required for signals to work
         self._on_connect_cb = on_connect_cb
 

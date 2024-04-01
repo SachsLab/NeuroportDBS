@@ -1,26 +1,30 @@
-from typing import Optional
+import json
+import subprocess
+import sys
+import typing
 import time
 
-import json
 import zmq
+from zmq.utils.monitor import parse_monitor_message
 from qtpy import QtCore, QtWidgets
 from serf.tools.db_wrap import DBWrapper
 
 from .widgets.ini_window import IniWindow
 from .widgets.SettingsDialog import SettingsDialog
 import open_mer.data_source
+import open_mer.data_source.interface
 
 
 class ProcedureGUI(IniWindow):
 
     def __init__(self):
-        self._data_source = None
+        self._data_source: typing.Optional[open_mer.data_source.interface.IDataSource] = None
         self._source_settings = {}
 
         super().__init__()
 
-        # TODO: It doesn't really have icons anymore. This code should move to FeaturesGUI
-
+        self._popen_snips: typing.Optional[subprocess.Popen] = None
+        self._popen_feats: typing.Optional[subprocess.Popen] = None
         self._b_recording = False
 
         self._init_connection()
@@ -31,6 +35,13 @@ class ProcedureGUI(IniWindow):
 
         self.show()
         self._do_modal_settings()
+
+    def __del__(self):
+        if self._data_source is not None:
+            self._data_source.set_recording_state(False, {"filename": None})
+            self._data_source.disconnect_requested()
+        super().__del__()
+        self._term_popen()
 
     def parse_settings(self):
         # Handles MainWindow geometry and collects self._theme_settings and self._ipc_settings
@@ -57,11 +68,15 @@ class ProcedureGUI(IniWindow):
     def _setup_ipc(self):
         self._sock_context = zmq.Context()
 
+        self._feature_pub_online = False
         self._features_sock = self._sock_context.socket(zmq.SUB)
+        self._feature_monitor = self._features_sock.get_monitor_socket()
         self._features_sock.connect(f"tcp://localhost:{self._ipc_settings['features']}")
         self._features_sock.setsockopt_string(zmq.SUBSCRIBE, "features")
 
+        self._snippet_pub_online = False
         self._snippet_sock = self._sock_context.socket(zmq.SUB)
+        self._snippet_monitor = self._snippet_sock.get_monitor_socket()
         self._snippet_sock.connect(f"tcp://localhost:{self._ipc_settings['snippet_status']}")
         self._snippet_sock.setsockopt_string(zmq.SUBSCRIBE, "snippet_status")
 
@@ -69,27 +84,36 @@ class ProcedureGUI(IniWindow):
         self._procedure_sock.bind(f"tcp://*:{self._ipc_settings['procedure_settings']}")
 
     def _cleanup_ipc(self):
-        for _sock in [self._features_sock, self._procedure_sock]:
+        for _sock in [
+            self._features_sock,
+            self._feature_monitor,
+            self._snippet_sock,
+            self._snippet_monitor,
+            self._procedure_sock
+        ]:
             _sock.setsockopt(zmq.LINGER, 0)
             _sock.close()
         self._sock_context.term()
 
     @QtCore.Slot(QtCore.QObject)
-    def _on_source_connected(self, data_source):
+    def _on_source_connected(self, data_source: open_mer.data_source.interface.IDataSource) -> None:
         self._data_source = data_source
 
     def _init_connection(self):
         if "class" in self._source_settings and self._source_settings["class"] is not None:
+            # TODO: self._data_source ?!
             _data_source = self._source_settings["class"](
                 settings_path=self._source_settings["settings_path"],
                 on_connect_cb=self._on_source_connected
             )
 
-    def __del__(self):
-        if self._data_source is not None:
-            self._data_source.set_recording_state(False, {"filename": None})
-            self._data_source.disconnect_requested()
-        super().__del__()
+    def _term_popen(self):
+        if self._popen_snips is not None:
+            self._popen_snips.terminate()
+            self._popen_snips = None
+        if self._popen_feats is not None:
+            self._popen_feats.terminate()
+            self._popen_feats = None
 
     def _setup_ui(self):
         self.setWindowTitle("OpenMER Procedure")
@@ -135,7 +159,7 @@ class ProcedureGUI(IniWindow):
         print(f"Publishing: {pub_string}")
         self._procedure_sock.send_string(pub_string)
 
-    def _do_modal_settings(self):
+    def _do_modal_settings(self) -> bool:
         win = SettingsDialog(self._subject_settings, self._procedure_settings)
         result = win.exec_()
         if result == QtWidgets.QDialog.Accepted:
@@ -157,10 +181,11 @@ class ProcedureGUI(IniWindow):
                 self._procedure_settings["procedure_id"] = proc_id
 
             self._publish_settings()
+            return True
         else:
             return False
 
-    def toggle_recording(self, on_off: Optional[bool] = None):
+    def toggle_recording(self, on_off: typing.Optional[bool] = None):
         if self._data_source is None:
             return
 
@@ -183,7 +208,52 @@ class ProcedureGUI(IniWindow):
                                 f"border-color : {rec_facecolor}; "
                                 "border-width: 2px}")
 
+    def _check_monitors(self):
+        for proc in ["snippet", "feature"]:
+            _monitor = getattr(self, f"_{proc}_monitor")
+            monitor_result = _monitor.poll(10, zmq.POLLIN)
+            if monitor_result:
+                data = _monitor.recv_multipart()
+                evt = parse_monitor_message(data)
+                if evt["event"] in (
+                        zmq.EVENT_ACCEPTED,
+                        zmq.EVENT_CONNECTED,
+                        zmq.EVENT_HANDSHAKE_SUCCEEDED
+                ):
+                    setattr(self, f"_{proc}_pub_online", True)
+                elif evt["event"] in (
+                        zmq.EVENT_DISCONNECTED,
+                        zmq.EVENT_MONITOR_STOPPED,
+                        zmq.EVENT_CLOSED,
+                ):
+                    setattr(self, f"_{proc}_pub_online", False)
+                elif evt["event"] in (
+                    zmq.EVENT_CONNECT_DELAYED,
+                    zmq.EVENT_CONNECT_RETRIED
+                ):
+                    pass
+                else:
+                    print(f"TODO: handle {evt['event']}")
+
     def _run_recording(self, on_off: bool):
+        # Manage Snippets_Process
+        self._term_popen()
+        self._check_monitors()
+        if self._popen_snips is None and not self._snippet_pub_online and on_off:
+            self._popen_snips = subprocess.Popen([
+                sys.executable,
+                "-m",
+                "open_mer.scripts.Snippets_Process",
+                f"--procedure-id={self._procedure_settings['procedure_id']}"
+            ])
+        if self._popen_feats is None and not self._feature_pub_online and on_off:
+            self._popen_feats = subprocess.Popen([
+                sys.executable,
+                "-m",
+                "open_mer.scripts.Features_Process",
+                f"--procedure-id={self._procedure_settings['procedure_id']}"
+            ])
+
         f_name, m_name, l_name = self.parse_patient_name(self._subject_settings['name'])
         file_info = {'filename': self._get_filename(),
                      'comment': self._subject_settings['NSP_comment'],
@@ -239,6 +309,7 @@ class ProcedureGUI(IniWindow):
         except zmq.ZMQError:
             pass
 
+        self._check_monitors()
         try:
             received_msg = self._snippet_sock.recv_string(flags=zmq.NOBLOCK)[len("snippet_status") + 1:]
             b_publish_settings |= received_msg == "refresh"

@@ -28,10 +28,9 @@ OpenMER is a Suite of applications for visualizing signals in real-time:
   * pushed on a [labstreaminglayer](https://github.com/sccn/labstreaminglayer) outlet;
   * broadcast over ZeroMQ (see [ZeroMQ Port list](for-developers.md#interprocess-communication))
 * *ProcedureGUI* - Sets patient and procedure info, and controls recording state.
-  * The recording button colour reflects a background database process (monitoring: blue, accumulating: red).
-* *FeaturesGUI* - Plots the history of raw segments or features by depth.
-  * The database interaction occurs via a Django app called [SERF](https://github.com/cboulay/SERF) backed by a MySQL database.
-  * Requires running MySQL database, and 2 SERF applications: *serf-cbacquire* and *serf-procfeatures*.
+  * The database interaction occurs via the ORM of a Django app called [SERF](https://github.com/cboulay/SERF) backed by a MySQL database.
+  * Launching ProcedureGUI also launches two processes:
+    * Segments_Process to capture raw segments at each depth and Features_Process to calculate features from those segments.
 * *CommentGUI* (not shown) - Send comments to the Blackrock NSP, with some widgets specialized for kinesthetic mapping.
 
 We also use a GUI application we developed called [*CereStimDBS*](https://github.com/CerebusOSS/CereStimDBS) for controlling the Blackrock CereStim96 in a convenient manner for DBS surgeries.
