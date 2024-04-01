@@ -1,25 +1,30 @@
-Our primary method of distributing the full OpenMER Suite is as a giant zip file. TODO: Link!
+The PC that runs our software is directly connected to the acquisition system, but it is never connected to the internet. Thus, we create a portable install on a thumb drive which we then copy to the clinical PC.
 
-If you want to setup the individual pieces on an internet-connected computer (e.g., for development or testing) then please look at the [For Developers](./for-developers.md) documentation. 
+> For development or testing on an internet-connected computer, or a non-Windows computer, please look at the [For Developers](for-developers.md) documentation.
 
-It is expected that the target computer is a standalone computer that has a dedicated connection to the data acquisition system, such as a manufacturer-provided PC which is usually not connected to the internet. Testing without the hardware is also possible using a signal generator source or a data playback source (see below for example).
+## Installation
 
-Extract the zip file to the target computer. Choose a destination with a lot of disk space because the data segments will be saved within.
+### Distribution
 
-Updates may come in the form of a smaller zip file to extract within a specific subfolder of the extracted distribution.
+Copy the `<distribution>` folder from the thumb drive to the instrument PC.
 
-Proceed with the [Usage Instructions](./usage-instructions.md)
+> Be sure to choose a destination with lots of disk space because many recording segments will be stored within the database located in this folder.
 
-## Test Environment - Without Hardware
+> If you do not have the `<distribution>` folder then follow the [Preparing Distribution](preparing-distribution.md) instructions to create it.
 
-### Emulate Blackrock NSP
+### Configure
 
-* Run "C:\Program Files (x86)\Blackrock Microsystems\NeuroPort Windows Suite\runNPlayAndCentral.bat"
-* Select a recording to play back
-* Use Central's hardware configuration tool to enable continuous recording and spike extraction on the recorded channels.
-* Follow the general [Usage Instructions](./usage-instructions.md) with one modification:
-    * When running `dbs-ddu`, choose "cbsdk playback" from the dropdown menu to reuse the depths from the recording. The value might not update until the file plays back a change in depth.
+The `<distribution>` folder is ready to use as-is. However, with some additional steps it can be more useful on the target PC.
 
-### Playback XDF file
+#### Shortcuts
 
-More instructions are needed. If you have a correctly formatted file, it may be enough to use [XDFStreamer](https://github.com/labstreaminglayer/App-XDFStreamer).
+* Make a desktop shortcut to `<distribution>\mysql\bin\mysqld.exe`.
+* Make a desktop shortcut to `<distribution>\<python>\scripts\OpenMER.bat`
+
+#### Settings files
+
+OpenMER functionality can be modified via INI files. See [Settings](settings.md) for more information.
+
+## Using OpenMER
+
+See [Usage Instructions](usage-instructions.md)

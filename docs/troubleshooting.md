@@ -1,6 +1,4 @@
-## Connectivity
-
-### Blackrock NSP
+## Blackrock NSP
 
 If Central is running then these tools should attempt to connect to Central's shared memory, and the network settings are irrelevant. If Central is not running then you'll have to make sure the network settings are correct, and this may depend on how your PC and NSP are connected.
 
@@ -12,6 +10,8 @@ The client (PC) port defaults to 51002
 The client IP address is 192.168.137.1 on Windows, and Mac and Linux use netmasks: 255.255.255.255 on Mac, and 192.168.137.255 on Linux
 The NSP IP address is 192.168.137.128 and port 51001 
 
+New digital NSPs (Gemini) have different settings and are not fully supported by OpenMER.
+
 ## DDU numbers changing too fast!
 
-Version 2 of FHC's DDU returns the depths in um, but the DDUGUI software is expecting numbers in mm. I have yet to figure out a reliable way to determine which drive is in use without crashing the serial port. The simple solution is to divide the value by 1000. For now, the way to do this is to uncomment a line in DDUGUI.py (search for "FHC DDU V2").
+Version 2 of FHC's DDU returns the depths in um, but the DepthGUI software is expecting numbers in mm. The DDU version should be automatically detected now. If you are still experiencing this issue then update OpenMER.
